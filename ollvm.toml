@@ -1,0 +1,16 @@
+
+[rust_remove_panic]
+enabled = true
+mode = "trap"
+exit_code = 101
+
+[remove_leak]
+enabled = true
+enable_builtins = true
+
+[[remove_leak.rules]]
+name = "InternalSecretKey"
+min_len = 24
+max_len = 256
+substrings = ["sk-live-", "sk-test-"]
+regex = '(sk-(?:live|test)-[0-9a-zA-Z]{16,64})'

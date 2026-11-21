@@ -1,0 +1,17 @@
+[package]
+name = "atest"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.37", features = ["macros", "rt-multi-thread", "time"] }
+
+[profile.release]
+strip = "symbols"
+debug = 0
+lto = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"
+
+[workspace]
