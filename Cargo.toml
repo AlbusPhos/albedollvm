@@ -3,7 +3,6 @@
 name = "albedollvm"
 version = "0.1.0"
 edition = "2024"
-description = "Rust-native LLVM out-of-tree plugin for compile-time string leak scrubbing and panic hardening"
 authors = ["AlbusPhos <owo.zzz@proton.me>"]
 license = "MPL-2.0"
 readme = "README.md"
