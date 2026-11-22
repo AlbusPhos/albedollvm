@@ -1,13 +1,21 @@
+// SPDX-License-Identifier: MPL-2.0
+//
+// Copyright (c) 2026 AlbusPhos <owo.zzz@proton.me>
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // src/all_pass/remove_leak.rs
 use std::sync::LazyLock;
 
 use lib_unknown::rand::core::fill_bytes;
 use llvm_pass::inkwell::values::{AsValueRef, BasicValueEnum};
-use llvm_pass::{ModulePass, ModuleRef, PreservedAnalyses};
 use llvm_pass::llvm_sys::core::LLVMIsAConstantDataArray;
+use llvm_pass::{ModulePass, ModuleRef, PreservedAnalyses};
 use regex::bytes::Regex;
 
-use crate::utils::conf::{CONFIG, LeakRuleConfig};
+use crate::utils::conf::{CONFIG, remove_leak::LeakRuleConfig};
 use crate::*;
 
 const PASS_NAME: &str = "RemoveLeak";
@@ -250,9 +258,6 @@ impl ModulePass for RemoveLeakPass {
             pwarn!(tag, module, "没有可用的规则，跳过 pass。");
             return PreservedAnalyses::All;
         }
-        // unsafe {
-        //     llvm_pass::llvm_sys::core::LLVMSetSourceFileName(module.as_raw_ptr(), c"".as_ptr(), 0);
-        // }
 
         let inkwell_module = module.as_inkwell();
         let m = &*inkwell_module;
@@ -261,6 +266,7 @@ impl ModulePass for RemoveLeakPass {
         let mut scratch_buf = Vec::with_capacity(256);
         let mut scrubbed_globals = 0usize;
 
+        m.set_source_file_name("");
         for global in m.get_globals() {
             let Some(BasicValueEnum::ArrayValue(array)) = global.get_initializer() else {
                 continue;

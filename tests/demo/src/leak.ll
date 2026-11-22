@@ -1,4 +1,3 @@
-; ModuleID = 'leak.ll'
 source_filename = "leak.ll"
 
 @rustc_path = private unnamed_addr constant [74 x i8] c"/rustc/3659db0d3e2cd634c766fcda79ed118eca31a3fd/library/core/src/panic.rs\00", align 1

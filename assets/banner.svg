@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Albedollvm — Rust-native out-of-tree LLVM obfuscation pass plugin">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0a0d12" offset=""/>
+      <stop offset="1" stop-color="#101722"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="950" y1="60" x2="1120" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86efac" offset=""/>
+      <stop offset="0.5" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="1030" cy="140" r="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5eead4" stop-opacity="0.16" offset=""/>
+      <stop offset="1" stop-color="#5eead4" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#fff" stroke-opacity="0.035"/>
+    </pattern>
+    <clipPath id="clip">
+      <rect width="1200" height="300" rx="12"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#clip)">
+    <!-- Background & Effects -->
+    <rect width="1200" height="300" fill="url(#bg)"/>
+    <rect width="1200" height="300" fill="url(#grid)"/>
+    <circle cx="1030" cy="140" r="260" fill="url(#glow)"/>
+
+    <!-- Geometric Monogram (Zero-overlap paths) -->
+    <g>
+      <polygon points="1030,50 1108,95 1108,185 1030,230 952,185 952,95"
+               fill="none" stroke="url(#accent)" stroke-opacity="0.35" stroke-width="1.5"/>
+      <polygon points="1030,74 1088,107 1088,173 1030,206 972,173 972,107"
+               fill="none" stroke="url(#accent)" stroke-opacity="0.16" stroke-dasharray="3 7"/>
+      <path d="M1030 82L1080 200H1055L1030 142L1005 200H980Z"
+            fill="url(#accent)" fill-opacity="0.92"/>
+      <path d="M1020.1 165H1039.9L1047.2 182H1012.8Z"
+            fill="url(#accent)" fill-opacity="0.5"/>
+      <circle cx="1030" cy="50" r="3.5" fill="#86efac"/>
+      <circle cx="1108" cy="185" r="3.5" fill="#5eead4"/>
+      <circle cx="952" cy="185" r="3.5" fill="#60a5fa"/>
+    </g>
+
+    <!-- Main Typography -->
+    <g font-family="Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+      <text x="72" y="88" fill="#7dd3a0" font-size="14" font-weight="600" letter-spacing="5">RUST &#215; LLVM</text>
+      <text x="68" y="168" fill="#f8fafc" font-size="72" font-weight="700" letter-spacing="-2.5">Albedollvm</text>
+      <text x="72" y="210" fill="#94a3b8" font-size="21" font-weight="400">Rust-native out-of-tree LLVM obfuscation pass plugin</text>
+    </g>
+
+    <!-- Monospace Tags & Version -->
+    <g font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="13">
+      <g transform="translate(0 238)" fill="#cbd5e1" text-anchor="middle">
+        <g fill="#fff" fill-opacity="0.04" stroke="#fff" stroke-opacity="0.12">
+          <rect x="72" width="126" height="30" rx="15"/>
+          <rect x="208" width="158" height="30" rx="15"/>
+          <rect x="376" width="126" height="30" rx="15"/>
+        </g>
+        <text x="135" y="19.5">RemoveLeak</text>
+        <text x="287" y="19.5">RustRemovePanic</text>
+        <text x="439" y="19.5">TOML-driven</text>
+      </g>
+      <text x="1128" y="270" text-anchor="end" fill="#64748b" font-size="12" letter-spacing="0.5">v0.1.0 &#183; MPL-2.0</text>
+    </g>
+  </g>
+
+  <!-- Subtle Inner Border for GitHub Light/Dark Mode -->
+  <rect width="1199" height="299" x="0.5" y="0.5" rx="11.5" fill="none" stroke="#fff" stroke-opacity="0.08"/>
+</svg>
