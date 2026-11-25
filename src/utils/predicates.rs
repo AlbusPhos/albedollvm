@@ -8,13 +8,13 @@
 
 #![allow(unused)]
 
+use llvm_pass::inkwell::IntPredicate;
 use llvm_pass::inkwell::builder::Builder;
 use llvm_pass::inkwell::context::ContextRef;
 use llvm_pass::inkwell::types::IntType;
 use llvm_pass::inkwell::values::{BasicValue, GlobalValue, IntValue};
-use llvm_pass::inkwell::IntPredicate;
 
-use lib_unknown::rand::core::{random, };
+use lib_unknown::rand::core::random;
 
 #[derive(Debug, Clone, Copy)]
 pub enum OpaquePredicateKind {
@@ -86,50 +86,36 @@ pub fn build_opaque_true_predicate<'ctx>(
     kind: OpaquePredicateKind,
 ) -> Option<IntValue<'ctx>> {
     let noise = load_noise(builder, ctx.i32_type(), noise_gv)?;
-    let x = builder
-        .build_xor(noise, random_i32(ctx), "op.x")
-        .ok()?;
+    let x = builder.build_xor(noise, random_i32(ctx), "op.x").ok()?;
 
     Some(match kind {
         OpaquePredicateKind::OddSquareMod8Eq1 => {
             let odd = builder.build_or(x, i32_const(ctx, 1), "op.odd").ok()?;
-            let square = builder
-                .build_int_mul(odd, odd, "op.sq")
-                .ok()?;
-            let masked = builder
-                .build_and(square, i32_const(ctx, 7), "op.m8")
-                .ok()?;
+            let square = builder.build_int_mul(odd, odd, "op.sq").ok()?;
+            let masked = builder.build_and(square, i32_const(ctx, 7), "op.m8").ok()?;
             builder
                 .build_int_compare(IntPredicate::EQ, masked, i32_const(ctx, 1), "op.pred")
                 .ok()?
         }
         OpaquePredicateKind::SquareMod4Le1 => {
             let square = builder.build_int_mul(x, x, "op.sq").ok()?;
-            let masked = builder
-                .build_and(square, i32_const(ctx, 3), "op.m4")
-                .ok()?;
+            let masked = builder.build_and(square, i32_const(ctx, 3), "op.m4").ok()?;
             builder
                 .build_int_compare(IntPredicate::ULT, masked, i32_const(ctx, 2), "op.pred")
                 .ok()?
         }
         OpaquePredicateKind::SumTwoSquaresMod4Ne3 => {
-            let y = builder
-                .build_xor(x, random_i32(ctx), "op.y")
-                .ok()?;
+            let y = builder.build_xor(x, random_i32(ctx), "op.y").ok()?;
             let sqx = builder.build_int_mul(x, x, "op.sqx").ok()?;
             let sqy = builder.build_int_mul(y, y, "op.sqy").ok()?;
             let sum = builder.build_int_add(sqx, sqy, "op.sum").ok()?;
-            let masked = builder
-                .build_and(sum, i32_const(ctx, 3), "op.m4")
-                .ok()?;
+            let masked = builder.build_and(sum, i32_const(ctx, 3), "op.m4").ok()?;
             builder
                 .build_int_compare(IntPredicate::NE, masked, i32_const(ctx, 3), "op.pred")
                 .ok()?
         }
         OpaquePredicateKind::ConsecutiveProductEven => {
-            let xp1 = builder
-                .build_int_add(x, i32_const(ctx, 1), "op.xp1")
-                .ok()?;
+            let xp1 = builder.build_int_add(x, i32_const(ctx, 1), "op.xp1").ok()?;
             let product = builder.build_int_mul(x, xp1, "op.prod").ok()?;
             let bit = builder
                 .build_and(product, i32_const(ctx, 1), "op.bit")
@@ -140,9 +126,7 @@ pub fn build_opaque_true_predicate<'ctx>(
         }
         OpaquePredicateKind::ShiftMaskLessEqual => {
             let one = i32_const(ctx, 1);
-            let shr = builder
-                .build_right_shift(x, one, false, "op.shr")
-                .ok()?;
+            let shr = builder.build_right_shift(x, one, false, "op.shr").ok()?;
             let shl = builder.build_left_shift(shr, one, "op.shl").ok()?;
             builder
                 .build_int_compare(IntPredicate::ULE, shl, x, "op.pred")
@@ -159,29 +143,21 @@ pub fn build_opaque_true_predicate<'ctx>(
                 .ok()?
         }
         OpaquePredicateKind::MbaOrAndXor => {
-            let y = builder
-                .build_xor(x, random_i32(ctx), "op.y")
-                .ok()?;
+            let y = builder.build_xor(x, random_i32(ctx), "op.y").ok()?;
             let or_xy = builder.build_or(x, y, "op.or").ok()?;
             let and_xy = builder.build_and(x, y, "op.and").ok()?;
-            let lhs = builder
-                .build_int_sub(or_xy, and_xy, "op.lhs")
-                .ok()?;
+            let lhs = builder.build_int_sub(or_xy, and_xy, "op.lhs").ok()?;
             let rhs = builder.build_xor(x, y, "op.rhs").ok()?;
             builder
                 .build_int_compare(IntPredicate::EQ, lhs, rhs, "op.pred")
                 .ok()?
         }
         OpaquePredicateKind::MbaAndOrAdd => {
-            let y = builder
-                .build_xor(x, random_i32(ctx), "op.y")
-                .ok()?;
+            let y = builder.build_xor(x, random_i32(ctx), "op.y").ok()?;
             let and_xy = builder.build_and(x, y, "op.and").ok()?;
             let or_xy = builder.build_or(x, y, "op.or").ok()?;
             let lhs = builder.build_int_add(x, y, "op.lhs").ok()?;
-            let rhs = builder
-                .build_int_add(and_xy, or_xy, "op.rhs")
-                .ok()?;
+            let rhs = builder.build_int_add(and_xy, or_xy, "op.rhs").ok()?;
             builder
                 .build_int_compare(IntPredicate::EQ, lhs, rhs, "op.pred")
                 .ok()?
@@ -190,12 +166,8 @@ pub fn build_opaque_true_predicate<'ctx>(
             let n = builder
                 .build_int_unsigned_rem(x, i32_const(ctx, 1000), "op.n")
                 .ok()?;
-            let np1 = builder
-                .build_int_add(n, i32_const(ctx, 1), "op.np1")
-                .ok()?;
-            let np2 = builder
-                .build_int_add(n, i32_const(ctx, 2), "op.np2")
-                .ok()?;
+            let np1 = builder.build_int_add(n, i32_const(ctx, 1), "op.np1").ok()?;
+            let np2 = builder.build_int_add(n, i32_const(ctx, 2), "op.np2").ok()?;
             let mul1 = builder.build_int_mul(n, np1, "op.m1").ok()?;
             let mul2 = builder.build_int_mul(mul1, np2, "op.m2").ok()?;
             let rem = builder

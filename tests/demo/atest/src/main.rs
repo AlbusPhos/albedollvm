@@ -80,11 +80,17 @@ async fn async_complex_flow(x: i32) -> &'static str {
 fn check_leak() {
     let secret = black_box("Bearer sk-live-0123456789abcdefABCDEF");
     assert_eq!(secret.len(), 37, "RemoveLeak 破坏了字符串常量长度！");
-    assert!(secret.starts_with("Bearer "), "RemoveLeak 破坏了非敏感前缀！");
+    assert!(
+        secret.starts_with("Bearer "),
+        "RemoveLeak 破坏了非敏感前缀！"
+    );
     assert!(!secret.contains("sk-live-"), "敏感密钥 sk-live- 未被擦除！");
 
     let src_file = black_box(file!());
-    assert!(!src_file.contains("main.rs"), "源码路径 src/main.rs 未被擦除！");
+    assert!(
+        !src_file.contains("main.rs"),
+        "源码路径 src/main.rs 未被擦除！"
+    );
     println!("[OK] RemoveLeak 内存自检通过: secret={secret}, file={src_file}");
 }
 
@@ -106,6 +112,26 @@ async fn check_control_flow() {
     println!("[OK] 同步与 Tokio 异步控制流自检通过");
 }
 
+#[inline(never)]
+fn check_bo() {
+    let secret = black_box("Bearer sk-live-bo-e2e-0123456789abcdef");
+    assert_eq!(secret.len(), 38, "BytesObfuscation 破坏了字符串长度！");
+    assert!(
+        secret.starts_with("Bearer "),
+        "BytesObfuscation 运行时解密前缀错误！"
+    );
+    assert!(
+        secret.ends_with("-bo-e2e-0123456789abcdef"),
+        "BytesObfuscation 运行时解密后缀错误！"
+    );
+    assert_eq!(
+        &secret.as_bytes()[7..15],
+        b"sk-live-",
+        "BytesObfuscation 运行时解密核心内容错误！"
+    );
+    println!("[OK] BytesObfuscation 运行时惰性解密自检通过: secret={secret}");
+}
+
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -122,5 +148,9 @@ async fn main() {
 
     if args.iter().any(|a| a == "--check-flow") || args.len() == 1 {
         check_control_flow().await;
+    }
+
+    if args.iter().any(|a| a == "--check-bo") {
+        check_bo();
     }
 }

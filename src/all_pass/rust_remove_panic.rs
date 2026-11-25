@@ -343,7 +343,7 @@ impl ModulePass for RustRemovePanicPass {
             return PreservedAnalyses::All;
         }
 
-        pdebug!(
+        pinfo!(
             tag,
             module,
             "成功清空 {} 个 panic 函数实现，并阻断了 {} 处 panic 调用。",

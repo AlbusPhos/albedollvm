@@ -7,9 +7,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // src/utils/conf.rs
-pub mod func;
+pub mod bytes_obfuscation;
 pub mod remove_leak;
 pub mod rust_remove_panic;
+pub mod rust_toolchain;
+pub mod target_func;
 
 use std::env;
 use std::fs;
@@ -29,9 +31,11 @@ pub static CONFIG: LazyLock<OllvmConfig> = LazyLock::new(OllvmConfig::load);
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct OllvmConfig {
+    pub rust_toolchain: rust_toolchain::RustToolchainConfig,
     pub rust_remove_panic: rust_remove_panic::RustRemovePanicConfig,
     pub remove_leak: remove_leak::RemoveLeakConfig,
-    pub target_func: func::TargetFuncConfig,
+    pub target_func: target_func::TargetFuncConfig,
+    pub bytes_obfuscation: bytes_obfuscation::BytesObfuscationConfig,
 }
 
 impl OllvmConfig {
@@ -39,6 +43,8 @@ impl OllvmConfig {
         let mut cfg = Self::load_raw();
         cfg.remove_leak.finalize();
         cfg.target_func.finalize();
+        cfg.rust_toolchain.finalize();
+        cfg.bytes_obfuscation.finalize();
         cfg
     }
 

@@ -36,7 +36,9 @@ fn test_rl_opt_scrubs_builtins_and_custom_rules() {
 
     assert!(ir.contains("@rustc_path = private unnamed_addr constant [74 x i8]"));
     assert!(ir.contains("@src_path = private unnamed_addr constant [19 x i8]"));
-    assert!(ir.contains(r#"@safe_str = private unnamed_addr constant [12 x i8] c"hello world\00""#));
+    assert!(
+        ir.contains(r#"@safe_str = private unnamed_addr constant [12 x i8] c"hello world\00""#)
+    );
 }
 
 #[test]

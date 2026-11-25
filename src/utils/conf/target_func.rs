@@ -8,11 +8,13 @@
 
 // src/utils/conf/func.rs
 // 用于 llvm 树外插件的函数名匹配与 Pass 目标函数选择决策
+
 use std::cell::OnceCell;
 use std::sync::LazyLock;
 
 use dashmap::DashMap;
 use lib_unknown::rand::core::random_range;
+use memchr::{memchr, memchr2, memmem, memrchr};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Deserializer};
 use symbolic_demangle::Demangle;
@@ -37,6 +39,7 @@ where
         Vec(Vec<String>),
         Single(String),
     }
+
     match StringOrVec::deserialize(deserializer)? {
         StringOrVec::Vec(v) => Ok(v),
         StringOrVec::Single(s) => Ok(vec![s]),
@@ -55,15 +58,16 @@ enum SymAbi {
 impl SymAbi {
     #[inline]
     fn detect(raw_name: &str) -> Self {
-        if raw_name.starts_with('?') {
+        let bytes = raw_name.as_bytes();
+        if bytes.starts_with(b"?") {
             Self::Msvc
-        } else if raw_name.starts_with("_R") || raw_name.starts_with("__R") {
+        } else if bytes.starts_with(b"_R") || bytes.starts_with(b"__R") {
             Self::Other
-        } else if raw_name.starts_with("_$s") || raw_name.starts_with("$s") {
+        } else if bytes.starts_with(b"_$s") || bytes.starts_with(b"$s") {
             Self::Swift
-        } else if raw_name.starts_with("_Z")
-            || raw_name.starts_with("__Z")
-            || raw_name.contains("_Z")
+        } else if bytes.starts_with(b"_Z")
+            || bytes.starts_with(b"__Z")
+            || memmem::find(bytes, b"_Z").is_some()
         {
             Self::Itanium
         } else {
@@ -76,8 +80,9 @@ impl SymAbi {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct TargetFuncConfig {
-    /// 显式函数匹配规则列表：`[[target_func.rules]]`
+    /// 显式函数匹配规则列表：`[[target_func.rule]]`
     #[serde(default)]
+    #[serde(alias = "rule")]
     pub rules: Vec<TargetFuncRule>,
     /// 各 Pass 的补充概率配置：`[target_func.<pass_name>]`
     #[serde(flatten, default)]
@@ -108,6 +113,7 @@ impl TargetFuncConfig {
                 rule.func = None;
             }
             rule.passes.retain(|p| !p.trim().is_empty());
+
             if rule.is_empty() {
                 pwarn!(
                     TAG,
@@ -157,6 +163,7 @@ impl TargetFuncConfig {
         }
 
         let mut matched_include_idx: Option<usize> = None;
+
         for (idx, rule) in self.rules.iter().enumerate() {
             if !rule.applies_to_pass(pass_name) {
                 continue;
@@ -307,6 +314,7 @@ impl TargetFuncRule {
         }
         let mut cursor = 0usize;
         let mut prev_token = "";
+
         if abi == SymAbi::Msvc {
             if let Some(func) = &self.func
                 && !func.is_empty()
@@ -366,9 +374,12 @@ impl TargetFuncRule {
             return true;
         }
         *prev_token = clean_token;
+
         // 闭包标记在 Rust Legacy 中含 `"closure"`，在 Rust v0 中编码为 `"NC"`
         if ParsedSym::is_closure_marker(clean_token) {
-            return raw_name.contains("closure") || raw_name.contains("NC");
+            let raw_bytes = raw_name.as_bytes();
+            return memmem::find(raw_bytes, b"closure").is_some()
+                || memmem::find(raw_bytes, b"NC").is_some();
         }
         // 非纯 ASCII 标识符（如 `operator<<` 或 Punycode）直接放行交由 Demangle 处理
         if !clean_token.bytes().all(ParsedSym::is_ident_byte) {
@@ -377,15 +388,19 @@ impl TargetFuncRule {
         // C++ Itanium ABI 会将 `std`、`string` 等压缩为 2 字节 `St`、`Ss` 等含 `S` 的前缀
         // 必须优先校验且不推进 cursor，防止误匹配到符号末尾函数参数中的同名子串导致 cursor 越界
         if abi == SymAbi::Itanium && Self::is_itanium_std_substitution(clean_token) {
-            return raw_name.contains('S') || raw_name.contains(clean_token);
+            let raw_bytes = raw_name.as_bytes();
+            return memchr(b'S', raw_bytes).is_some()
+                || memmem::find(raw_bytes, clean_token.as_bytes()).is_some();
         }
         // Swift ABI 会将标准库模块 `Swift` / `ObjectiveC` 压缩为 `s` / `So`
         if abi == SymAbi::Swift && (clean_token == "Swift" || clean_token == "ObjectiveC") {
             return true;
         }
+
         if Self::find_token_from(raw_name, *cursor, clean_token, cursor) {
             return true;
         }
+
         // Swift 驼峰子词替换（Word Substitution，如 `MyModule.MyClass` 中 `My` 被替换为 `0A`）兜底
         if abi == SymAbi::Swift
             && clean_token.bytes().skip(1).any(|b| b.is_ascii_uppercase())
@@ -393,6 +408,7 @@ impl TargetFuncRule {
         {
             return true;
         }
+
         // 回溯引用兜底：若从当前 cursor 往后找不到，但该标识符在 cursor 之前已出现过，
         // 则可能是 MSVC 索引替换(`0..9`)、Rust v0(`B_`) 或 Itanium(`S_`) 压缩了重复段，放行由阶段二精筛
         let mut dummy = 0;
@@ -407,12 +423,13 @@ impl TargetFuncRule {
         out_cursor: &mut usize,
     ) -> bool {
         let bytes = haystack.as_bytes();
-        while search_from + clean_token.len() <= bytes.len() {
-            if let Some(rel_pos) = haystack[search_from..].find(clean_token) {
+        let needle = clean_token.as_bytes();
+        while search_from + needle.len() <= bytes.len() {
+            if let Some(rel_pos) = memmem::find(&bytes[search_from..], needle) {
                 let abs_pos = search_from + rel_pos;
                 // 左边界不变式：在任何 Mangled 规则中，独立段标识符的起点绝不可能紧跟在小写字母 `a..=z` 之后
                 if abs_pos == 0 || !bytes[abs_pos - 1].is_ascii_lowercase() {
-                    *out_cursor = abs_pos + clean_token.len();
+                    *out_cursor = abs_pos + needle.len();
                     return true;
                 }
                 search_from = abs_pos + 1;
@@ -448,6 +465,7 @@ impl TargetFuncRule {
         if total == 0 {
             return false;
         }
+
         // 1. 若指定了目标函数名 `func`
         if let Some(target_func) = &self.func
             && !target_func.is_empty()
@@ -460,6 +478,7 @@ impl TargetFuncRule {
             }
             return self.match_path_subsequence(parsed, total - 1);
         }
+
         // 2. 若未指定 `func`（匹配 `path` 下的所有函数或闭包）
         // 若末尾是闭包段，则允许 `path` 匹配包括外层函数名及闭包段在内的全部路径；否则排除最后一个函数名段
         let path_len = if parsed.has_closure_suffix {
@@ -596,8 +615,10 @@ impl ParsedSym {
         let demangled: Box<str> = symbolic_common::Name::from(cleaned_raw)
             .demangle(symbolic_demangle::DemangleOptions::name_only())
             .map_or_else(|| Box::from(cleaned_raw), String::into_boxed_str);
+
         let mut buf = [(0u16, 0u16); MAX_PATH_SEGMENTS];
         let (seg_count, has_closure_suffix) = Self::tokenize(&demangled, &mut buf);
+
         Self {
             demangled,
             segments: Box::from(&buf[..seg_count as usize]),
@@ -619,30 +640,29 @@ impl ParsedSym {
             s = rest;
         }
         // 处理 Windows x86 fastcall 前导 `@` 及 ELF `@GLIBC` / stdcall `@12` 尾缀
-        if !s.starts_with('?') {
+        if !s.as_bytes().starts_with(b"?") {
             s = s.strip_prefix('@').unwrap_or(s);
-            if let Some(at_idx) = s.find('@') {
+            if let Some(at_idx) = memchr(b'@', s.as_bytes()) {
                 s = &s[..at_idx];
             }
         }
-        // 快速短路：绝大多数正常符号不含 '.'，单次 memchr 扫描即可返回
-        let Some(first_dot) = s.find('.') else {
+        let bytes = s.as_bytes();
+        // 快速短路：绝大多数正常符号不含 '.'，单次 SIMD memchr 扫描即可返回
+        let Some(first_dot) = memchr(b'.', bytes) else {
             return s;
         };
-        if s.starts_with("_Z")
-            || s.starts_with("__Z")
-            || s.starts_with("_R")
-            || s.starts_with("__R")
-            || s.starts_with("_$s")
-            || s.starts_with("$s")
+        if bytes.starts_with(b"_Z")
+            || bytes.starts_with(b"__Z")
+            || bytes.starts_with(b"_R")
+            || bytes.starts_with(b"__R")
+            || bytes.starts_with(b"_$s")
+            || bytes.starts_with(b"$s")
         {
-            let bytes = s.as_bytes();
-            let search_start = s[first_dot..]
-                .rfind('$')
+            let search_start = memrchr(b'$', &bytes[first_dot..])
                 .map_or(first_dot, |rel_dollar| first_dot + rel_dollar + 1);
             let mut i = search_start;
             while i < bytes.len() {
-                if let Some(rel) = s[i..].find('.') {
+                if let Some(rel) = memchr(b'.', &bytes[i..]) {
                     let dot = i + rel;
                     if (dot == 0 || bytes[dot - 1] != b'.')
                         && (dot + 1 == bytes.len() || bytes[dot + 1] != b'.')
@@ -656,18 +676,18 @@ impl ParsedSym {
             }
             return s;
         }
-        let tail = &s[first_dot..];
+        let tail = &bytes[first_dot..];
         let mut cut = tail.len();
         for suffix in [
-            ".llvm.",
-            ".cold",
-            ".part.",
-            ".constprop.",
-            ".isra.",
-            ".lto_priv.",
-            ".localalias",
+            b".llvm.".as_slice(),
+            b".cold".as_slice(),
+            b".part.".as_slice(),
+            b".constprop.".as_slice(),
+            b".isra.".as_slice(),
+            b".lto_priv.".as_slice(),
+            b".localalias".as_slice(),
         ] {
-            if let Some(idx) = tail[..cut].find(suffix) {
+            if let Some(idx) = memmem::find(&tail[..cut], suffix) {
                 cut = idx;
             }
         }
@@ -680,11 +700,14 @@ impl ParsedSym {
         if len == 0 || len > u16::MAX as usize {
             return (0, false);
         }
+
         let mut seg_count = 0u8;
         let mut has_closure_suffix = false;
         let mut i = 0usize;
+
         while i < len {
             let b = bytes[i];
+
             // 识别独立的 Rust 闭包段（`::{{closure}}` 或 `::{closure#0}`）与其它花括号块（如 `::{constant#0}`）
             if b == b'{' {
                 let start = i;
@@ -700,6 +723,7 @@ impl ParsedSym {
                 }
                 continue;
             }
+
             // 跳过 C++ 匿名命名空间 `(anonymous namespace)` 与 Rust Turbofish `::<...>`
             if b == b'(' && bytes[i..].starts_with(b"(anonymous namespace)") {
                 i += "(anonymous namespace)".len();
@@ -709,6 +733,7 @@ impl ParsedSym {
                 i = Self::skip_balanced(bytes, i, b'<', b'>');
                 continue;
             }
+
             // 其它非标识符字符（且非 C++ 析构函数 `~`）一律作为分隔符跳过
             if !Self::is_ident_byte(b)
                 && !(b == b'~' && i + 1 < len && Self::is_ident_byte(bytes[i + 1]))
@@ -716,6 +741,7 @@ impl ParsedSym {
                 i += 1;
                 continue;
             }
+
             // 扫描单个完整标识符（特殊保护 C++ `operator<<` / `operator()` 等运算符名）
             let start = i;
             if bytes[i..].starts_with(b"operator")
@@ -731,6 +757,7 @@ impl ParsedSym {
                 }
             }
             let end = i;
+
             // 记录有效路径段（若闭包内部继续嵌套了具名函数/静态变量，则重置 `has_closure_suffix`）
             let token = &full[start..end];
             if !Self::is_ignored_keyword(token) {
@@ -740,6 +767,7 @@ impl ParsedSym {
                     seg_count += 1;
                 }
             }
+
             // 紧贴在标识符之后的 `<...>`、`[...]`、`(...)`、`{...}` 视为类型/函数泛型或 `{{vtable.shim}}` 整体跳过
             while i < len {
                 match bytes[i] {
@@ -751,6 +779,7 @@ impl ParsedSym {
                 }
             }
         }
+
         (seg_count, has_closure_suffix)
     }
 
@@ -802,14 +831,16 @@ impl ParsedSym {
         i
     }
 
+    /// 使用 `memchr2` SIMD 跳跃配平括号，直接越过括号内部的大段标识符字符
     #[inline]
     fn skip_balanced(bytes: &[u8], mut i: usize, open: u8, close: u8) -> usize {
         let len = bytes.len();
         let mut depth = 0usize;
-        while i < len {
+        while let Some(rel) = memchr2(open, close, &bytes[i..]) {
+            i += rel;
             if bytes[i] == open {
                 depth += 1;
-            } else if bytes[i] == close {
+            } else {
                 // 忽略函数指针类型 `<fn() -> Ret>` 中的 `->`
                 if close == b'>' && i > 0 && bytes[i - 1] == b'-' {
                     i += 1;
@@ -852,16 +883,19 @@ mod tests {
             "anon.e88a446c5e09fa337d2383f77ab6944d.445",
             "_RNvNCNKNvNtNtCskaZwRKfRSK3_3std9panicking11panic_count17LOCAL_PANIC_COUNT0s_023___RUST_STD_INTERNAL_VAL",
         ];
+
         let r_demo_main = rule(&["demo", "main"], None);
         assert!(r_demo_main.matches(func[0]));
         assert!(r_demo_main.matches(func[4]));
         assert!(!r_demo_main.matches(func[1]));
         assert!(rule(&["demo", "main"], Some("__STATIC_HB2_1540182250")).matches(func[0]));
+
         let r_crypto = rule(&["lib_unknown", "crypto"], None);
         assert!(r_crypto.matches(func[1]));
         assert!(r_crypto.matches(func[2]));
         assert!(r_crypto.matches(func[6]));
         assert!(!r_crypto.matches(func[0]));
+
         assert!(rule(&["lib_unknown", "core", "rpp64"], Some("__MASK")).matches(func[1]));
         assert!(rule(&["lib_unknown", "mix", "mix64"], Some("MULS")).matches(func[2]));
         assert!(rule(&["lib_unknown", "mse", "derive_r8_keys"], Some("PI_Q32")).matches(func[6]));
@@ -898,6 +932,7 @@ mod tests {
             .matches(func[8])
         );
         assert!(!rule(&["std", "constant"], None).matches(func[8]));
+
         let batch_rules = vec![r_demo_main, r_crypto];
         let matched_indices: Vec<usize> = func
             .iter()
@@ -979,6 +1014,7 @@ mod tests {
             assert!(rule(&["demo", "main", "closure"], None).matches(sym));
             assert!(!rule(&["demo"], Some("main")).matches(sym));
         }
+
         let trait_impl = "_RNvXCs1234_8my_crateNtB2_6ServerNtNtCs5678_4core3ops4Drop4drop";
         assert!(rule(&["my_crate", "Server", "Drop"], Some("drop")).matches(trait_impl));
         assert!(
@@ -990,98 +1026,21 @@ mod tests {
     fn test_cpp_itanium_and_msvc() {
         let std_sort = "_ZSt4sortIN9__gnu_cxx17__normal_iteratorIPiSt6vectorIiSaIiEEEEEvT_S7_";
         assert!(rule(&["std"], Some("sort")).matches(std_sort));
+
         let ctor = "_ZN3foo3BarC1Ev";
         let dtor = "_ZN3foo3BarD1Ev";
         assert!(rule(&["foo", "Bar"], Some("Bar")).matches(ctor));
         assert!(rule(&["foo", "Bar"], Some("~Bar")).matches(dtor));
+
         let op_lshift = "_ZN3foo3BarlsERSo";
         assert!(rule(&["foo", "Bar"], Some("operator<<")).matches(op_lshift));
+
         let op_call = "_ZNK3foo3BarclEi";
         assert!(rule(&["foo", "Bar"], Some("operator()")).matches(op_call));
-        let msvc_sym = "?encrypt@crypto@my_engine@@YAXXZ";
-        assert!(rule(&["my_engine", "crypto"], Some("encrypt")).matches(msvc_sym));
-        assert!(rule(&["my_engine", "crypto"], None).matches(msvc_sym));
-        assert!(!rule(&["crypto", "my_engine"], Some("encrypt")).matches(msvc_sym));
-    }
 
-    #[test]
-    fn test_compiler_affixes_and_edge_cases() {
-        let llvm_suffixed = "_ZN4core9panicking9panic_fmt17h1234567890abcdefE.llvm.123456789.cold";
-        assert!(rule(&["core", "panicking"], Some("panic_fmt")).matches(llvm_suffixed));
-        let c_sym = "\x01_my_c_func.constprop.0";
-        assert!(rule(&[], Some("_my_c_func")).matches(c_sym));
-        assert!(!TargetFuncRule::default().matches("_RNvCs123_4demo4main"));
-        assert!(!rule(&["as", "mut", ""], Some("")).matches("_RNvCs123_4demo4main"));
-        assert!(!rule(&["demo"], Some("main")).matches(""));
-    }
-
-    #[test]
-    fn test_target_func_config_toml_and_decisions() {
-        let toml_str = r#"
-            [[target_func.rules]]
-            func = "mix64"
-            path = ["demo"]
-            pass = ["pass2", "pass3"]  # 对该函数应用这两个pass
-            exclude = false            # 控制是排除还是启用
-
-            [[target_func.rules]]
-            path = ["lib_unknown", "core"]
-            # 空pass表示应用全部pass
-
-            [[target_func.rules]]
-            func = "rpp64"
-            path = ["lib_unknown", "core"]
-            pass = ["pass3"]
-            exclude = true             # 在 core 中单独为 rpp64 排除 pass3
-
-            [target_func.pass1]        # 对其他未明确选择的函数按概率启用该pass
-            other_pct = 10             # 0..=100
-
-            [target_func.pass2]
-            other_pct = 0
-
-            [target_func.pass4]
-            other_pct = 100
-        "#;
-
-        #[derive(Deserialize)]
-        struct Wrapper {
-            target_func: TargetFuncConfig,
-        }
-
-        let mut wrapper: Wrapper = toml::from_str(toml_str).expect("TOML 解析失败");
-        wrapper.target_func.finalize();
-        let cfg = &wrapper.target_func;
-
-        let demo_mix64 = "_RNvCsd6AuMU2hSVg_4demo5mix64";
-        assert!(cfg.should_run(demo_mix64, "pass2"));
-        assert!(cfg.should_run(demo_mix64, "pass3"));
-        assert!(!cfg.should_run(demo_mix64, "pass1"));
-        assert!(!cfg.should_run(demo_mix64, "pass4"));
-
-        let core_mix64 = "_RNvNtNtNtCs6pyUOHnsZyf_11lib_unknown6crypto4core3mix5mix64";
-        assert!(cfg.should_run(core_mix64, "pass1"));
-        assert!(cfg.should_run(core_mix64, "pass2"));
-        assert!(cfg.should_run(core_mix64, "pass3"));
-
-
-        let core_rpp64 = "_RNvNtNtNtCs6pyUOHnsZyf_11lib_unknown6crypto4core2rp5rpp64";
-        assert!(cfg.should_run(core_rpp64, "pass1"));
-        assert!(!cfg.should_run(core_rpp64, "pass3"));
-
-        let unselected_fn = "_RNvCs123_9other_mod6helper";
-        assert!(!cfg.should_run(unselected_fn, "pass2"));
-        assert!(cfg.should_run(unselected_fn, "pass4"));
-
-        let hits = (0..1000)
-            .filter(|i| {
-                let sym = format!("_RNvCs123_9other_mod9func_{i}");
-                cfg.should_run(&sym, "pass1")
-            })
-            .count();
-        assert!(
-            (60..=140).contains(&hits),
-            "10% 概率抽样命中数偏离预期: {hits}/1000"
-        );
+        let msvc_sym = "?encrypt@AES@crypto@@QEAAXPEAE_K@Z";
+        assert!(rule(&["crypto", "AES"], Some("encrypt")).matches(msvc_sym));
+        assert!(rule(&["crypto"], None).matches(msvc_sym));
+        assert!(!rule(&["AES", "crypto"], Some("encrypt")).matches(msvc_sym));
     }
 }

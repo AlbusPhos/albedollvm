@@ -9,3 +9,4 @@
 pub mod conf;
 pub mod logger;
 mod predicates;
+pub(crate) mod rs2ir;

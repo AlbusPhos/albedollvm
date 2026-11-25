@@ -23,7 +23,10 @@ fn test_rp_opt_trap_mode_and_dce() {
 
     assert!(logs.contains("发现 2 个 rust panic 相关函数 (mode: Trap)"));
     assert!(ir.contains("call void @llvm.trap()"));
-    assert!(ir.contains(r#"[ "deopt"(i32"#), "Operand bundle must be preserved");
+    assert!(
+        ir.contains(r#"[ "deopt"(i32"#),
+        "Operand bundle must be preserved"
+    );
     assert!(
         !ir.contains("define internal void @_ZN4core9panicking18panic_bounds_check"),
         "Gutted panic function should be removed by GlobalDCE"
@@ -55,7 +58,10 @@ fn test_rp_cargo_project_e2e() {
         .arg("--check-flow")
         .status()
         .expect("Failed to run atest --check-flow");
-    assert!(flow_status.success(), "Normal control flow failed under rp pass");
+    assert!(
+        flow_status.success(),
+        "Normal control flow failed under rp pass"
+    );
 
     // 2. 触发数组越界 Panic，验证进程异常终止且无任何 Panic 格式化文本输出
     let panic_out = Command::new(&bin_path)

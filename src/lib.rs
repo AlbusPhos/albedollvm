@@ -6,11 +6,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+// src/lib.rs
 #![allow(unused)]
+
 mod all_pass;
 mod utils;
 
-use crate::all_pass::{remove_leak, rust_remove_panic};
+use crate::all_pass::{bytes_obfuscation, remove_leak, rust_remove_panic};
 use llvm_pass::*;
 
 export_llvm_plugin! {
@@ -28,8 +30,11 @@ export_llvm_plugin! {
                 mpm.add_global_dce();
                 true
             }
+            "bytes_obfuscation" | "bo" => {
+                mpm.add_pass(bytes_obfuscation::BytesObfuscationPass);
+                true
+            }
             _ => false,
         });
-
     }
 }

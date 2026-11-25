@@ -1,3 +1,8 @@
+[rust_toolchain]
+toolchain = "1.98.0"                # 仅版本或通道：如 1.98.0 / nightly-2026-04-02 / stable
+target = "x86_64-unknown-linux-gnu" # 可选，目标三元组：如 x86_64-unknown-linux-gnu / aarch64-apple-darwin
+target_dir = "target"               # 可选，构建目录（亦支持别名 build_dir）：默认 "target"
+
 [rust_remove_panic]
 enabled = true
 mode = "trap"
@@ -38,3 +43,15 @@ other_pct = 0
 
 [target_func.pass4]
 other_pct = 100
+
+[bytes_obfuscation]
+enabled = true
+other_pct = 0
+
+[[bytes_obfuscation.rules]]
+name = "BoE2ESecret"
+min_len = 24
+max_len = 256
+substrings = ["sk-live-bo-e2e-"]
+regex = 'sk-live-bo-e2e-[0-9a-f]{16}'
+level = 2

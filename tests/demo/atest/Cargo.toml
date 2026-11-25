@@ -10,11 +10,9 @@ publish = false
 tokio = { version = "1.37", features = ["macros", "rt-multi-thread", "time"] }
 
 [profile.release]
-strip = "symbols"
+#strip = "symbols"
 debug = 0
 lto = true
 opt-level = "z"
 codegen-units = 1
 panic = "abort"
-
-[workspace]

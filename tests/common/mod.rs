@@ -96,7 +96,7 @@ pub fn run_opt(ir_file_name: &str, passes: &str, toml_content: &str) -> (String,
     let output = Command::new(&opt_bin)
         .env("OLLVM_CONFIG", &cfg_file)
         .env("OLLVM_LOG_LEVEL", "DEBUG")
-        .env("OLLVM_LOG_COLOR", "never")
+        .env("OLLVM_LOG_COLOR", "always")
         .arg(format!("-load-pass-plugin={}", plugin.display()))
         .arg(format!("-passes={passes}"))
         .arg("-S")
@@ -108,11 +108,14 @@ pub fn run_opt(ir_file_name: &str, passes: &str, toml_content: &str) -> (String,
 
     let _ = fs::remove_file(&cfg_file);
 
-    let stdout_logs = String::from_utf8_lossy(&output.stdout).into_owned();
+    let mut stdout_logs = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.is_empty() {
+        stdout_logs.push_str(&stderr);
+    }
     assert!(
         output.status.success(),
-        "`{opt_bin}` failed:\nstdout:\n{stdout_logs}\nstderr:\n{stderr}"
+        "`{opt_bin}` failed:\nlogs:\n{stdout_logs}"
     );
 
     let ir_out = fs::read_to_string(&out_ir_file).expect("read output IR");
@@ -148,7 +151,15 @@ pub fn build_demo_atest(suite_tag: &str, passes: &str, custom_toml: Option<&str>
         fs::create_dir_all(&target_dir).expect("create target_dir");
     } else {
         let _ = Command::new("cargo")
-            .args(["+nightly-2026-04-02", "clean", "-p", "atest", "--release", "--target", &target])
+            .args([
+                "+nightly-2026-04-02",
+                "clean",
+                "-p",
+                "atest",
+                "--release",
+                "--target",
+                &target,
+            ])
             .arg("--target-dir")
             .arg(&target_dir)
             .current_dir(&atest_dir)
@@ -183,6 +194,7 @@ pub fn build_demo_atest(suite_tag: &str, passes: &str, custom_toml: Option<&str>
         .env_remove("RUSTC_WRAPPER")
         .env("OLLVM_CONFIG", &cfg_path)
         .env("OLLVM_LOG_LEVEL", "INFO")
+        .env("OLLVM_LOG_COLOR", "always")
         .env("RUSTFLAGS", &rustflags)
         .status()
         .expect("Failed to execute cargo +nightly build for demo/atest");
@@ -210,5 +222,4 @@ pub fn build_demo_atest(suite_tag: &str, passes: &str, custom_toml: Option<&str>
         bin_path
     );
     bin_path
-
 }
