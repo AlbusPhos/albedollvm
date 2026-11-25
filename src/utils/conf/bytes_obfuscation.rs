@@ -6,14 +6,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // src/utils/conf/bytes_obfuscation.rs
+use super::TAG;
+use crate::{pdebug, pwarn};
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
 use lib_unknown::rand::core::random_range;
 use memchr::memmem::Finder;
 use regex::bytes::Regex as BytesRegex;
 use serde::Deserialize;
-use super::TAG;
-use crate::{pdebug, pwarn};
 
 const MIN_OBF_LEVEL: u8 = 1;
 const MAX_OBF_LEVEL: u8 = 3;

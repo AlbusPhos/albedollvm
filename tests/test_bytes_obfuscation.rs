@@ -45,7 +45,6 @@ fn test_bo_opt_rules_phi_and_verify() {
 
     let (ir, logs) = common::run_opt("bytes.ll", "bo,verify", toml);
 
-
     assert!(
         logs.contains("发现 4 个待混淆字节串"),
         "候选常量数量不匹配，日志:\n{logs}"
@@ -68,7 +67,9 @@ fn test_bo_opt_rules_phi_and_verify() {
     assert!(ir.contains("sk-live-0023456789abcdef1234"));
     assert!(ir.contains("ret ptr @excluded_key"));
     assert!(ir.contains("sk-live-mutable-0123456789ab"));
-    assert!(ir.contains(r#"@safe_str = private unnamed_addr constant [12 x i8] c"hello world\00""#));
+    assert!(
+        ir.contains(r#"@safe_str = private unnamed_addr constant [12 x i8] c"hello world\00""#)
+    );
 }
 
 #[test]

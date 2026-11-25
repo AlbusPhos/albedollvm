@@ -218,8 +218,8 @@ impl RustToolchainConfig {
     pub fn is_valid_target_dir(s: &str) -> bool {
         TARGET_DIR_REGEX.is_match(s)
             && !s
-            .split('/')
-            .any(|seg| seg.is_empty() || seg == "." || seg == "..")
+                .split('/')
+                .any(|seg| seg.is_empty() || seg == "." || seg == "..")
     }
 
     /// 校验是否为合法的分配器选项（`"talc"` | `"libc"` | `"std"`）
@@ -249,8 +249,8 @@ fn default_talc_heap_size() -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::conf::remove_leak::RemoveLeakConfig;
     use super::*;
+    use crate::utils::conf::remove_leak::RemoveLeakConfig;
 
     #[test]
     fn test_valid_toolchains() {

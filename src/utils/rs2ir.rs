@@ -34,9 +34,7 @@ fn build_allocator_parts(tc_cfg: &RustToolchainConfig) -> (String, String, &'sta
     match tc_cfg.allocator() {
         Allocator::Talc => {
             let heap_size = tc_cfg.talc_heap_size();
-            let deps = format!(
-                "{DEFAULT_DEP}\ntalc = \"5.1.1\"\nspinning_top = \"0.3\""
-            );
+            let deps = format!("{DEFAULT_DEP}\ntalc = \"5.1.1\"\nspinning_top = \"0.3\"");
             let header = format!(
                 r#"#![no_std]
 #![cfg(not(test))]
@@ -71,7 +69,7 @@ fn panic(_: &PanicInfo) -> ! {
     loop {}
 }
 "#
-                .to_owned();
+            .to_owned();
             (deps, header, "libc")
         }
         Allocator::Std => {
@@ -79,7 +77,7 @@ fn panic(_: &PanicInfo) -> ! {
             let header = r#"#![cfg(not(test))]
 extern crate alloc;
 "#
-                .to_owned();
+            .to_owned();
             (deps, header, "std")
         }
     }
@@ -327,9 +325,9 @@ incremental = false
 /// 严格校验文件名是否属于当前编译单元的产物（前缀后必须为结尾、`'-'` 或 `'.'`）
 #[inline]
 fn is_unit_artifact(file_name: &str, prefix: &str) -> bool {
-    file_name.strip_prefix(prefix).is_some_and(|rest| {
-        rest.is_empty() || rest.starts_with('-') || rest.starts_with('.')
-    })
+    file_name
+        .strip_prefix(prefix)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('-') || rest.starts_with('.'))
 }
 
 /// 负责在 `to_ir` 结束时清理线程私有的临时源码目录（包含 src/、Cargo.toml 及 out.ll）
@@ -367,7 +365,7 @@ impl Drop for TargetCleanupGuard<'_> {
                 let path = entry.path();
                 if let Some(name) = path.file_name().and_then(|n| n.to_str())
                     && (is_unit_artifact(name, self.unit_prefix)
-                    || is_unit_artifact(name, &lib_prefix))
+                        || is_unit_artifact(name, &lib_prefix))
                 {
                     if path.is_dir() {
                         let _ = fs::remove_dir_all(path);

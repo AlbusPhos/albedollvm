@@ -14,13 +14,12 @@ use llvm_pass::inkwell::values::{
 };
 use llvm_pass::llvm_sys::core::{
     LLVMContextSetDiscardValueNames, LLVMContextShouldDiscardValueNames, LLVMCountIncoming,
-    LLVMDeleteGlobal, LLVMGetBasicBlockParent, LLVMGetBasicBlockTerminator,
-    LLVMGetEntryBasicBlock, LLVMGetFirstBasicBlock, LLVMGetFirstInstruction, LLVMGetFirstUse,
-    LLVMGetIncomingBlock, LLVMGetIncomingValue, LLVMGetInstructionOpcode, LLVMGetInstructionParent,
-    LLVMGetModuleContext, LLVMGetNextBasicBlock, LLVMGetNextInstruction, LLVMGetNextUse,
-    LLVMGetNumArgOperands, LLVMGetNumOperands, LLVMGetNumSuccessors, LLVMGetOperand,
-    LLVMGetSuccessor, LLVMGetTypeKind, LLVMGetUser, LLVMIsAConstantDataArray, LLVMIsAInstruction,
-    LLVMSetOperand, LLVMTypeOf,
+    LLVMDeleteGlobal, LLVMGetBasicBlockParent, LLVMGetBasicBlockTerminator, LLVMGetEntryBasicBlock,
+    LLVMGetFirstBasicBlock, LLVMGetFirstInstruction, LLVMGetFirstUse, LLVMGetIncomingBlock,
+    LLVMGetIncomingValue, LLVMGetInstructionOpcode, LLVMGetInstructionParent, LLVMGetModuleContext,
+    LLVMGetNextBasicBlock, LLVMGetNextInstruction, LLVMGetNextUse, LLVMGetNumArgOperands,
+    LLVMGetNumOperands, LLVMGetNumSuccessors, LLVMGetOperand, LLVMGetSuccessor, LLVMGetTypeKind,
+    LLVMGetUser, LLVMIsAConstantDataArray, LLVMIsAInstruction, LLVMSetOperand, LLVMTypeOf,
 };
 use llvm_pass::llvm_sys::linker::LLVMLinkModules2;
 use llvm_pass::llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBool, LLVMModuleRef, LLVMValueRef};
@@ -390,7 +389,12 @@ impl ModulePass for BytesObfuscationPass {
             match parse_res {
                 Ok(m) => m,
                 Err(err) => {
-                    perror!(tag, module, "解析混淆 IR 到临时 Module 失败: {}", err.to_string());
+                    perror!(
+                        tag,
+                        module,
+                        "解析混淆 IR 到临时 Module 失败: {}",
+                        err.to_string()
+                    );
                     return PreservedAnalyses::All;
                 }
             }
@@ -556,8 +560,7 @@ impl ModulePass for BytesObfuscationPass {
                                         else {
                                             continue;
                                         };
-                                        let Some(call_val) =
-                                            call_site.try_as_basic_value().basic()
+                                        let Some(call_val) = call_site.try_as_basic_value().basic()
                                         else {
                                             continue;
                                         };
